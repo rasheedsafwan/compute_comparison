@@ -17,12 +17,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Debug OIDC token claims
-        run: |
-          curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
-          | python3 -c "import sys, json, base64; d=json.load(sys.stdin); t=d['value'].split('.')[1]; t += '=' * (-len(t) % 4); print(json.dumps(json.loads(base64.urlsafe_b64decode(t)), indent=2))"
-
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::861076396381:role/github-actions-compute-comparison
@@ -40,9 +34,8 @@ jobs:
         run: terraform -chdir=environments/dev validate
 
       - name: Terraform plan
-        run: terraform -chdir=environments/dev plan -var="ecr_image_uri=${{ vars.ECR_IMAGE_URI }}" -out=tfplan
+        run: terraform -chdir=environments/dev plan -var="ecr_image_uri=${{ secrets.ECR_IMAGE_URI }}" -out=tfplan
 
-      # Save the calculated plan file so the apply job uses the exact same data
       - name: Upload Terraform Plan
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: actions/upload-artifact@v4
@@ -55,7 +48,7 @@ jobs:
     needs: plan
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    environment: production   
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
