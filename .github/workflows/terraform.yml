@@ -18,7 +18,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::<account-id>:role/github-actions-compute-comparison
+          role-to-assume: arn:aws:iam::861076396381:role/github-actions-compute-comparison
           aws-region: us-east-1
 
       - uses: hashicorp/setup-terraform@v3
@@ -54,7 +54,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::<account-id>:role/github-actions-compute-comparison
+          role-to-assume: arn:aws:iam::861076396381:role/github-actions-compute-comparison
           aws-region: us-east-1
 
       - uses: hashicorp/setup-terraform@v3
