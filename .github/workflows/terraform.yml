@@ -26,10 +26,9 @@ jobs:
       - name: Build Lambda function
         run: |
           cd app/lambda
-          zip -r build/handler.zip handler.py bootstrap
-          cd ../..
-          echo "Checking if handler.zip was created:"
-          ls -la app/lambda/build/
+          mkdir -p build
+          zip -r build/handler.zip handler.py
+          ls -la build/
 
       - uses: hashicorp/setup-terraform@v3
 
