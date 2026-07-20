@@ -43,36 +43,41 @@ resource "aws_dynamodb_table" "tf_lock" {
   }
 }
 
+# OIDC provider for GitHub Actions
 resource "aws_iam_openid_connect_provider" "github" {
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
 }
 
-resource "aws_iam_role" "github-actions-compute-comparison" {
-  name = "github-actions-compute-comparison"
+data "aws_iam_policy_document" "github_actions_assume" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.github.arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+    condition {
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:job_workflow_ref"
+      values   = ["rasheedsafwan/compute_comparison/.github/workflows/terraform.yml@*"]
+    }
+    condition {
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["repo:rasheedsafwan/compute_comparison:*"]
+    }
+  }
+}
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          Federated = aws_iam_openid_connect_provider.github.arn
-        }
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Condition = {
-          StringEquals = {
-            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          }
-          StringLike = {
-            # Restrict to YOUR repo only — replace with your actual GitHub username/org and repo name
-            "token.actions.githubusercontent.com:sub" = "repo:rasheedsafwan/compute_comparison:*"
-          }
-        }
-      }
-    ]
-  })
+resource "aws_iam_role" "github-actions-compute-comparison" {
+  name               = "github-actions-compute-comparison"
+  assume_role_policy = data.aws_iam_policy_document.github_actions_assume.json
 }
 
 resource "aws_iam_role_policy_attachment" "github_actions_permissions" {
