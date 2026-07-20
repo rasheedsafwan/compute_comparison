@@ -22,6 +22,15 @@ jobs:
           role-to-assume: arn:aws:iam::861076396381:role/github-actions-compute-comparison
           aws-region: us-east-1
 
+      # BUILD LAMBDA 
+      - name: Build Lambda function
+        run: |
+          cd app/lambda
+          zip -r build/handler.zip handler.py bootstrap
+          cd ../..
+          echo "Checking if handler.zip was created:"
+          ls -la app/lambda/build/
+
       - uses: hashicorp/setup-terraform@v3
 
       - name: Terraform fmt
@@ -56,6 +65,15 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::861076396381:role/github-actions-compute-comparison
           aws-region: us-east-1
+
+      # BUILD LAMBDA
+      - name: Build Lambda function
+        run: |
+          cd app/lambda
+          zip -r build/handler.zip handler.py bootstrap
+          cd ../..
+          echo "Checking if handler.zip was created:"
+          ls -la app/lambda/build/
 
       - uses: hashicorp/setup-terraform@v3
 
