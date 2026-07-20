@@ -1,0 +1,72 @@
+name: terraform
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::<account-id>:role/github-actions-compute-comparison
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform fmt
+        run: terraform -chdir=environments/dev fmt -check
+
+      - name: Terraform init
+        run: terraform -chdir=environments/dev init
+
+      - name: Terraform validate
+        run: terraform -chdir=environments/dev validate
+
+      - name: Terraform plan
+        run: terraform -chdir=environments/dev plan -var="ecr_image_uri=${{ vars.ECR_IMAGE_URI }}" -out=tfplan
+
+      # Save the calculated plan file so the apply job uses the exact same data
+      - name: Upload Terraform Plan
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: environments/dev/tfplan
+          retention-days: 1
+
+  apply:
+    needs: plan
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production   
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::<account-id>:role/github-actions-compute-comparison
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform init
+        run: terraform -chdir=environments/dev init
+
+      - name: Download Terraform Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: environments/dev
+
+      - name: Terraform apply
+        run: terraform -chdir=environments/dev apply tfplan
