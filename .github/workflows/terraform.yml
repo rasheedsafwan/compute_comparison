@@ -17,18 +17,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Debug OIDC token claims
+        run: |
+          curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
+          | python3 -c "import sys, json, base64; d=json.load(sys.stdin); t=d['value'].split('.')[1]; t += '=' * (-len(t) % 4); print(json.dumps(json.loads(base64.urlsafe_b64decode(t)), indent=2))"
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::861076396381:role/github-actions-compute-comparison
           aws-region: us-east-1
 
       - uses: hashicorp/setup-terraform@v3
-
-      - name: Debug OIDC token claims
-        run: |
-          curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
-          | python3 -c "import sys, json, base64; d=json.load(sys.stdin); t=d['value'].split('.')[1]; t += '=' * (-len(t) % 4); print(json.dumps(json.loads(base64.urlsafe_b64decode(t)), indent=2))"
 
       - name: Terraform fmt
         run: terraform -chdir=environments/dev fmt -check
