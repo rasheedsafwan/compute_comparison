@@ -22,12 +22,18 @@ jobs:
           role-to-assume: arn:aws:iam::861076396381:role/github-actions-compute-comparison
           aws-region: us-east-1
 
-      # BUILD LAMBDA 
+      # FIXED: Build Lambda function
       - name: Build Lambda function
         run: |
           cd app/lambda
           mkdir -p build
-          zip -r build/handler.zip handler.py
+          echo "=== Files in lambda directory ==="
+          ls -la
+          echo ""
+          echo "=== Creating handler.zip ==="
+          zip -j build/handler.zip handler.py
+          echo ""
+          echo "=== Build directory contents ==="
           ls -la build/
 
       - uses: hashicorp/setup-terraform@v3
@@ -65,14 +71,19 @@ jobs:
           role-to-assume: arn:aws:iam::861076396381:role/github-actions-compute-comparison
           aws-region: us-east-1
 
-      # BUILD LAMBDA
+      # FIXED: Build Lambda function for apply job
       - name: Build Lambda function
         run: |
           cd app/lambda
-          zip -r build/handler.zip handler.py bootstrap
-          cd ../..
-          echo "Checking if handler.zip was created:"
-          ls -la app/lambda/build/
+          mkdir -p build
+          echo "=== Files in lambda directory ==="
+          ls -la
+          echo ""
+          echo "=== Creating handler.zip ==="
+          zip -j build/handler.zip handler.py
+          echo ""
+          echo "=== Build directory contents ==="
+          ls -la build/
 
       - uses: hashicorp/setup-terraform@v3
 
