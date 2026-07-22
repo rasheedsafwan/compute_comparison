@@ -113,13 +113,32 @@ jobs:
       - name: Verify Deployment
         if: steps.terraform_apply.outputs.apply_exit_code == '0'
         run: |
-          echo "Checking if the Lambda function was created/updated..."
-          function_name="$(terraform -chdir=environments/dev output -raw lambda_function_name)"
-          aws lambda get-function \
-            --region us-east-1 \
-            --function-name "$function_name" \
-            --query 'Configuration.[FunctionName,LastModified,State]' \
-            --output text
+          set +e
+          echo "Checking deployed endpoints..."
+
+          lambda_128="$(terraform -chdir=environments/dev output -raw lambda_128_endpoint 2>/dev/null)"
+          lambda_1024="$(terraform -chdir=environments/dev output -raw lambda_1024_endpoint 2>/dev/null)"
+          fargate_dns="$(terraform -chdir=environments/dev output -raw fargate_alb_dns 2>/dev/null)"
+          ec2_dns="$(terraform -chdir=environments/dev output -raw ec2_alb_dns 2>/dev/null)"
+
+          check_url() {
+            local label="$1" url="$2"
+            if [ -z "$url" ]; then
+              echo "⚠️ $label: no output value found, skipping"
+              return
+            fi
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$url")"
+            echo "$label ($url): HTTP $code"
+          }
+
+          # Lambda endpoint outputs are expected to already be full URLs.
+          check_url "Lambda 128MB"  "$lambda_128"
+          check_url "Lambda 1024MB" "$lambda_1024"
+          # ALB DNS outputs are bare hostnames, so build the URL.
+          [ -n "$fargate_dns" ] && check_url "Fargate ALB" "http://$fargate_dns/"
+          [ -n "$ec2_dns" ]     && check_url "EC2 ALB"     "http://$ec2_dns/"
+
+          exit 0
 
       # This step will run even if the apply fails
       - name: Post-deployment status
