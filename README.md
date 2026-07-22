@@ -127,31 +127,6 @@ My AWS account had a default Lambda concurrency limit of 10 — the maximum numb
 
 ---
 
-## Project structure
-
-```
-compute-comparison/
-├── scenarios/
-│   ├── low-spiky.js           # k6 script: 20s burst / 90s idle x3 + cooldown
-│   ├── medium-steady.js       # k6 script: 30s ramp + 4m hold + 30s ramp down
-│   └── high-sustained.js      # k6 script: 1m ramp + 8m hold + 1m ramp down
-├── targets/
-│   ├── lambda-128mb/           # Lambda function config (128MB)
-│   ├── lambda-1024mb/          # Lambda function config (1024MB)
-│   ├── fargate/                # Fargate task definition (256/512)
-│   └── ec2/                    # EC2 (t3.small) app deployment
-├── results/
-│   ├── low-spiky/               # Raw k6 JSON output + cost calculations per platform
-│   ├── medium-steady/
-│   └── high-sustained/
-├── cost-model/
-│   └── scaled-cost.py             # Normalizes window cost → cost per 1M requests
-├── compute_comparison_build_guide.md   # Full analysis report (this repo's main deliverable)
-└── README.md
-```
-
----
-
 ## Tech stack
 
 - **k6** for load generation and latency/error measurement
