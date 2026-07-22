@@ -22,19 +22,13 @@ jobs:
           role-to-assume: arn:aws:iam::861076396381:role/github-actions-compute-comparison
           aws-region: us-east-1
 
-      # FIXED: Build Lambda function
       - name: Build Lambda function
         run: |
           cd app/lambda
           mkdir -p build
-          echo "=== Files in lambda directory ==="
-          ls -la
-          echo ""
-          echo "=== Creating handler.zip ==="
           zip -j build/handler.zip handler.py
-          echo ""
-          echo "=== Build directory contents ==="
-          ls -la build/
+          cd ../..
+          ls -la app/lambda/build/
 
       - uses: hashicorp/setup-terraform@v3
 
@@ -42,13 +36,13 @@ jobs:
         run: terraform -chdir=environments/dev fmt -check
 
       - name: Terraform init
-        run: terraform -chdir=environments/dev init
+        run: terraform -chdir=environments/dev init -input=false
 
       - name: Terraform validate
         run: terraform -chdir=environments/dev validate
 
       - name: Terraform plan
-        run: terraform -chdir=environments/dev plan -var="ecr_image_uri=${{ secrets.ECR_IMAGE_URI }}" -out=tfplan
+        run: terraform -chdir=environments/dev plan -input=false -var="ecr_image_uri=${{ secrets.ECR_IMAGE_URI }}" -out=tfplan
 
       - name: Upload Terraform Plan
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -67,28 +61,26 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: aws-actions/configure-aws-credentials@v4
+        env:
+          # Skip the post-job credential cleanup step (not a `with:` input)
+          AWS_SKIP_CLEANUP_STEP: true
         with:
           role-to-assume: arn:aws:iam::861076396381:role/github-actions-compute-comparison
           aws-region: us-east-1
 
-      # FIXED: Build Lambda function for apply job
+      # Rebuild the same artifact the plan was generated against so the
+      # Lambda package on disk matches what's referenced in the saved plan.
       - name: Build Lambda function
         run: |
           cd app/lambda
           mkdir -p build
-          echo "=== Files in lambda directory ==="
-          ls -la
-          echo ""
-          echo "=== Creating handler.zip ==="
           zip -j build/handler.zip handler.py
-          echo ""
-          echo "=== Build directory contents ==="
-          ls -la build/
+          cd ../..
 
       - uses: hashicorp/setup-terraform@v3
 
       - name: Terraform init
-        run: terraform -chdir=environments/dev init
+        run: terraform -chdir=environments/dev init -input=false
 
       - name: Download Terraform Plan
         uses: actions/download-artifact@v4
@@ -97,4 +89,32 @@ jobs:
           path: environments/dev
 
       - name: Terraform apply
-        run: terraform -chdir=environments/dev apply tfplan
+        id: terraform_apply
+        run: |
+          set +e
+          terraform -chdir=environments/dev apply -input=false tfplan
+          exit_code=$?
+          set -e
+          echo "apply_exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit $exit_code
+
+      - name: Verify Deployment
+        if: always()
+        run: |
+          echo "Checking if the Lambda function was created/updated..."
+          aws lambda get-function \
+            --region us-east-1 \
+            --function-name "$(terraform -chdir=environments/dev output -raw lambda_function_name)" \
+            --query 'Configuration.[FunctionName,LastModified,State]' \
+            --output text || true
+
+      # This step will run even if the apply fails
+      - name: Post-deployment status
+        if: always()
+        run: |
+          echo "Deployment completed with exit code: ${{ steps.terraform_apply.outputs.apply_exit_code }}"
+          if [ "${{ steps.terraform_apply.outputs.apply_exit_code }}" == "0" ]; then
+            echo "✅ Terraform apply successful!"
+          else
+            echo "⚠️ Terraform apply failed, check the logs above"
+          fi
