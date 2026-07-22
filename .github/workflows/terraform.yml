@@ -52,6 +52,18 @@ jobs:
           path: environments/dev/tfplan
           retention-days: 1
 
+      # Upload the exact zip bytes that source_code_hash was computed against.
+      # `zip` embeds timestamps, so rebuilding it later (even from identical
+      # source) produces a different hash and breaks `terraform apply` on a
+      # saved plan with a "function returned an inconsistent result" error.
+      - name: Upload Lambda artifact
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-zip
+          path: app/lambda/build/handler.zip
+          retention-days: 1
+
   apply:
     needs: plan
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -68,14 +80,14 @@ jobs:
           role-to-assume: arn:aws:iam::861076396381:role/github-actions-compute-comparison
           aws-region: us-east-1
 
-      # Rebuild the same artifact the plan was generated against so the
-      # Lambda package on disk matches what's referenced in the saved plan.
-      - name: Build Lambda function
-        run: |
-          cd app/lambda
-          mkdir -p build
-          zip -j build/handler.zip handler.py
-          cd ../..
+      # Use the exact same zip bytes the plan job hashed — do NOT rebuild it
+      # here, since `zip` embeds timestamps and a rebuild would produce a
+      # different source_code_hash than what's baked into the saved plan.
+      - name: Download Lambda artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-zip
+          path: app/lambda/build
 
       - uses: hashicorp/setup-terraform@v3
 
@@ -99,14 +111,15 @@ jobs:
           exit $exit_code
 
       - name: Verify Deployment
-        if: always()
+        if: steps.terraform_apply.outputs.apply_exit_code == '0'
         run: |
           echo "Checking if the Lambda function was created/updated..."
+          function_name="$(terraform -chdir=environments/dev output -raw lambda_function_name)"
           aws lambda get-function \
             --region us-east-1 \
-            --function-name "$(terraform -chdir=environments/dev output -raw lambda_function_name)" \
+            --function-name "$function_name" \
             --query 'Configuration.[FunctionName,LastModified,State]' \
-            --output text || true
+            --output text
 
       # This step will run even if the apply fails
       - name: Post-deployment status
