@@ -2,9 +2,11 @@
 
 **k6-driven, cost-normalized, cold-start aware**
 
-This project benchmarks four AWS compute execution environments — **Lambda (128MB)**, **Lambda (1024MB)**, **Fargate (256 vCPU / 512MB)**, and **EC2 (t3.small)** — under three distinct traffic shapes to answer a practical question: *which compute platform should you actually pick, and does the answer change depending on how spiky your traffic is?*
+This project benchmarks four AWS compute execution environments—**AWS Lambda (128MB)**, **AWS Lambda (1024MB)**, **Amazon ECS Fargate (256 CPU / 512MB)**, and **Amazon EC2 Auto Scaling (t3.small)**—under three distinct traffic patterns to answer a practical question: **which AWS compute platform should you choose, and does the answer change depending on your workload?**
 
-Rather than a single "load test," this repo runs the same request pattern against all four platforms across three k6 traffic models (bursty/idle, steady, and high-concurrency sustained), then normalizes cost per request so the platforms can be compared fairly despite very different test durations.
+All infrastructure is **provisioned using Terraform**, with reusable modules creating the networking, IAM, DynamoDB, API Gateway, ECS, EC2, Application Load Balancers, and supporting AWS resources. This ensures every compute platform is deployed consistently and can be reproduced from code.
+
+Rather than running a single load test, the project deploys the same application to all four compute environments and executes identical k6 traffic scenarios (bursty/idle, steady, and high-concurrency sustained). Performance metrics and cost per request are then compared across platforms to provide a fair, data-driven evaluation of latency, scalability, operational trade-offs, and cost efficiency.
 
 <img width="505" height="502" alt="compute-comparison drawio" src="https://github.com/user-attachments/assets/8f5a00d7-d574-4e83-a022-e3bc10a683e6" />
 
